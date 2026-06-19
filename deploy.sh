@@ -4,7 +4,7 @@ rm -rf build
 mkdir -p build/classes
 
 echo "compilation..."
-javac -cp "lib/*" -d build/classes src/*.java
+javac -cp "lib/*" -d build/classes $(find src -name "*.java")
 
 if [ $? -ne 0 ]; then
     echo "Compilation failed."
