@@ -106,26 +106,49 @@ public class FrontControllerServlet extends HttpServlet {
         if (listClassAnnoted.isEmpty()) {
             return Map.of();
         }
-        // on affiche les methodes annotées avec l'url spécifié, si l'url n'existe pas ou est vide, on affiche toutes les methodes annotées avec ses urls
-        return listClassAnnoted.stream()
+
+        Map<String, Method> result = listClassAnnoted.stream()
                 .flatMap(className -> {
                     try {
                         Class<?> clazz = Class.forName(packageName + "." + className);
+
                         return Arrays.stream(clazz.getDeclaredMethods())
-                                .filter(method -> method.isAnnotationPresent(Mapping.class))
-                                .filter(method -> {
-                                    Mapping mapping = method.getAnnotation(Mapping.class);
-                                    return url == null || url.isBlank() || mapping.value().equals(url);
-                                })
-                                .map(method -> Map.entry(className + "." + method.getName(), method));
+                                .filter(m -> m.isAnnotationPresent(Mapping.class))
+                                .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).value(), url))
+                                .map(m -> Map.entry(m.getName(), m));
+
                     } catch (ClassNotFoundException e) {
                         e.printStackTrace();
-                        return null;
+                        return java.util.stream.Stream.<Map.Entry<String, Method>>empty();
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (m1, m2) -> m1));
 
+        if (result.isEmpty()) {
+            return listClassAnnoted.stream()
+                    .flatMap(className -> {
+                        try {
+                            Class<?> clazz = Class.forName(packageName + "." + className);
+
+                            return Arrays.stream(clazz.getDeclaredMethods())
+                                    .filter(m -> m.isAnnotationPresent(Mapping.class))
+                                    .map(m -> Map.entry(m.getName(), m));
+
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
+                            return java.util.stream.Stream.<Map.Entry<String, Method>>empty();
+                        }
+                    })
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            Map.Entry::getValue,
+                            (m1, m2) -> m1));
+        }
+
+        return result;
     }
 
     @Override
@@ -140,17 +163,19 @@ public class FrontControllerServlet extends HttpServlet {
 
     public void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
-        out.println(req.getRequestURI());
+        String url = req.getServletPath();
+        out.println(url);
         out.println("Liste des classes annotees :");
         for (String s : listClassAnnoted) {
             out.println(s);
         }
-        Map<String, Method> methods = listMethodsAnnotatedWithMapping(req.getRequestURI());
+
+        Map<String, Method> methods = listMethodsAnnotatedWithMapping(url);
         if (methods.isEmpty()) {
-            out.println("Aucune methode trouvee pour l'url : " + req.getRequestURI());
+            out.println("Aucune methode trouvee pour l'url : " + url);
         } else {
-            out.println("Liste des methodes annotees avec l'url : " + req.getRequestURI());
-            methods.forEach((name, method) -> out.println(name));
+            out.println("Liste des methodes annotees avec l'url : " + url);
+            methods.forEach((name, method) -> out.println(name + " - " + method.getDeclaringClass().getName()));
         }
     }
 }
