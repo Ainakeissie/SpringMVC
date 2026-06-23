@@ -175,7 +175,7 @@ public class FrontControllerServlet extends HttpServlet {
             out.println("Aucune methode trouvee pour l'url : " + url);
         } else {
             out.println("Liste des methodes annotees avec l'url : " + url);
-            methods.forEach((name, method) -> out.println(name + " - " + method.getDeclaringClass().getName()));
+            methods.forEach((name, method) -> out.println(name + " - " + method.getName()));
         }
     }
 }
