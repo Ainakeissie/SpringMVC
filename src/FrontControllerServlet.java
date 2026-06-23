@@ -3,14 +3,19 @@ package src;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Method;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
@@ -18,6 +23,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import src.annotation.Controller;
+import src.annotation.Mapping;
 
 public class FrontControllerServlet extends HttpServlet {
     private final List<String> listClassAnnoted = new ArrayList<>();
@@ -93,8 +99,33 @@ public class FrontControllerServlet extends HttpServlet {
 
         if (clazz.isAnnotationPresent(Controller.class)) {
             listClassAnnoted.add(clazz.getSimpleName());
-            System.out.println("Controller trouvé : " + clazz.getName());
         }
+    }
+
+    private Map<String, Method> listMethodsAnnotatedWithMapping(String url) {
+        if (listClassAnnoted.isEmpty()) {
+            return Map.of();
+        }
+        // on affiche les methodes annotées avec l'url spécifié, si l'url n'existe pas ou est vide, on affiche toutes les methodes annotées avec ses urls
+        return listClassAnnoted.stream()
+                .flatMap(className -> {
+                    try {
+                        Class<?> clazz = Class.forName(packageName + "." + className);
+                        return Arrays.stream(clazz.getDeclaredMethods())
+                                .filter(method -> method.isAnnotationPresent(Mapping.class))
+                                .filter(method -> {
+                                    Mapping mapping = method.getAnnotation(Mapping.class);
+                                    return url == null || url.isBlank() || mapping.value().equals(url);
+                                })
+                                .map(method -> Map.entry(className + "." + method.getName(), method));
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
     }
 
     @Override
@@ -110,9 +141,16 @@ public class FrontControllerServlet extends HttpServlet {
     public void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
         out.println(req.getRequestURI());
-        out.println("Liste des classes annotées avec @Controller :");
+        out.println("Liste des classes annotees :");
         for (String s : listClassAnnoted) {
             out.println(s);
+        }
+        Map<String, Method> methods = listMethodsAnnotatedWithMapping(req.getRequestURI());
+        if (methods.isEmpty()) {
+            out.println("Aucune methode trouvee pour l'url : " + req.getRequestURI());
+        } else {
+            out.println("Liste des methodes annotees avec l'url : " + req.getRequestURI());
+            methods.forEach((name, method) -> out.println(name));
         }
     }
 }
