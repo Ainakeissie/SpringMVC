@@ -102,54 +102,63 @@ public class FrontControllerServlet extends HttpServlet {
         }
     }
 
-    private Map<String, Method> listMethodsAnnotatedWithMapping(String url) {
-        if (listClassAnnoted.isEmpty()) {
-            return Map.of();
-        }
+    private Map<String, String> listMethodsAnnotatedWithMapping(String url) {
+    if (listClassAnnoted.isEmpty()) {
+        return Map.of();
+    }
 
-        Map<String, Method> result = listClassAnnoted.stream()
+    Map<String, String> result = listClassAnnoted.stream()
+            .flatMap(className -> {
+                try {
+                    Class<?> clazz = Class.forName(packageName + "." + className);
+
+                    return Arrays.stream(clazz.getDeclaredMethods())
+                            .filter(m -> m.isAnnotationPresent(Mapping.class))
+                            .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).value(), url))
+                            .map(m -> Map.entry(
+                                    m.getName(),
+                                    m.getAnnotation(Mapping.class).value()
+                            ));
+
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                    return java.util.stream.Stream.<Map.Entry<String, String>>empty();
+                }
+            })
+            .collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (a, b) -> a
+            ));
+
+    // fallback : si aucune méthode ne correspond à l'URL → toutes les méthodes @Mapping
+    if (result.isEmpty()) {
+        return listClassAnnoted.stream()
                 .flatMap(className -> {
                     try {
                         Class<?> clazz = Class.forName(packageName + "." + className);
 
                         return Arrays.stream(clazz.getDeclaredMethods())
                                 .filter(m -> m.isAnnotationPresent(Mapping.class))
-                                .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).value(), url))
-                                .map(m -> Map.entry(m.getName(), m));
+                                .map(m -> Map.entry(
+                                        m.getName(),
+                                        m.getAnnotation(Mapping.class).value()
+                                ));
 
                     } catch (ClassNotFoundException e) {
                         e.printStackTrace();
-                        return java.util.stream.Stream.<Map.Entry<String, Method>>empty();
+                        return java.util.stream.Stream.<Map.Entry<String, String>>empty();
                     }
                 })
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         Map.Entry::getValue,
-                        (m1, m2) -> m1));
-
-        if (result.isEmpty()) {
-            return listClassAnnoted.stream()
-                    .flatMap(className -> {
-                        try {
-                            Class<?> clazz = Class.forName(packageName + "." + className);
-
-                            return Arrays.stream(clazz.getDeclaredMethods())
-                                    .filter(m -> m.isAnnotationPresent(Mapping.class))
-                                    .map(m -> Map.entry(m.getName(), m));
-
-                        } catch (ClassNotFoundException e) {
-                            e.printStackTrace();
-                            return java.util.stream.Stream.<Map.Entry<String, Method>>empty();
-                        }
-                    })
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            Map.Entry::getValue,
-                            (m1, m2) -> m1));
-        }
-
-        return result;
+                        (a, b) -> a
+                ));
     }
+
+    return result;
+}
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
@@ -170,12 +179,12 @@ public class FrontControllerServlet extends HttpServlet {
             out.println(s);
         }
 
-        Map<String, Method> methods = listMethodsAnnotatedWithMapping(url);
+        Map<String, String> methods = listMethodsAnnotatedWithMapping(url);
         if (methods.isEmpty()) {
             out.println("Aucune methode trouvee pour l'url : " + url);
         } else {
             out.println("Liste des methodes annotees avec l'url : " + url);
-            methods.forEach((name, method) -> out.println(name + " - " + method.getName()));
+            methods.forEach((name, value) -> out.println(name + " - " + value));
         }
     }
 }
