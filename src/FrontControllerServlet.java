@@ -3,14 +3,19 @@ package src;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Method;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
@@ -18,6 +23,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import src.annotation.Controller;
+import src.annotation.Mapping;
 
 public class FrontControllerServlet extends HttpServlet {
     private final List<String> listClassAnnoted = new ArrayList<>();
@@ -93,9 +99,66 @@ public class FrontControllerServlet extends HttpServlet {
 
         if (clazz.isAnnotationPresent(Controller.class)) {
             listClassAnnoted.add(clazz.getSimpleName());
-            System.out.println("Controller trouvé : " + clazz.getName());
         }
     }
+
+    private Map<String, String> listMethodsAnnotatedWithMapping(String url) {
+    if (listClassAnnoted.isEmpty()) {
+        return Map.of();
+    }
+
+    Map<String, String> result = listClassAnnoted.stream()
+            .flatMap(className -> {
+                try {
+                    Class<?> clazz = Class.forName(packageName + "." + className);
+
+                    return Arrays.stream(clazz.getDeclaredMethods())
+                            .filter(m -> m.isAnnotationPresent(Mapping.class))
+                            .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).value(), url))
+                            .map(m -> Map.entry(
+                                    m.getName(),
+                                    m.getAnnotation(Mapping.class).value()
+                            ));
+
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                    return java.util.stream.Stream.<Map.Entry<String, String>>empty();
+                }
+            })
+            .collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (a, b) -> a
+            ));
+
+    // fallback : si aucune méthode ne correspond à l'URL → toutes les méthodes @Mapping
+    if (result.isEmpty()) {
+        return listClassAnnoted.stream()
+                .flatMap(className -> {
+                    try {
+                        Class<?> clazz = Class.forName(packageName + "." + className);
+
+                        return Arrays.stream(clazz.getDeclaredMethods())
+                                .filter(m -> m.isAnnotationPresent(Mapping.class))
+                                .map(m -> Map.entry(
+                                        m.getName(),
+                                        m.getAnnotation(Mapping.class).value()
+                                ));
+
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                        return java.util.stream.Stream.<Map.Entry<String, String>>empty();
+                    }
+                })
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (a, b) -> a
+                ));
+    }
+
+    return result;
+}
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
@@ -109,10 +172,19 @@ public class FrontControllerServlet extends HttpServlet {
 
     public void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
-        out.println(req.getRequestURI());
-        out.println("Liste des classes annotées avec @Controller :");
+        String url = req.getServletPath();
+        out.println(url);
+        out.println("Liste des classes annotees :");
         for (String s : listClassAnnoted) {
             out.println(s);
+        }
+
+        Map<String, String> methods = listMethodsAnnotatedWithMapping(url);
+        if (methods.isEmpty()) {
+            out.println("Aucune methode trouvee pour l'url : " + url);
+        } else {
+            out.println("Liste des methodes annotees avec l'url : " + url);
+            methods.forEach((name, value) -> out.println(name + " - " + value));
         }
     }
 }
