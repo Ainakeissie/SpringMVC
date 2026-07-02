@@ -204,6 +204,19 @@ public class FrontControllerServlet extends HttpServlet {
             methods.forEach((util, urlMethode) -> out.println(
                     urlMethode.nomClasse + "." + urlMethode.nomMethode +
                             " - URL: " + util.url + " METHOD: " + util.method));
+            out.println("Invoquer la methode qui correspond à l'url");
+            methods.forEach((util, urlMethode) -> {
+                try {
+                    if(util.url.equals(url) && util.method.equals(httpMethod)) {
+                        Class<?> clazz = Class.forName(packageName + "." + urlMethode.nomClasse);
+                        Object instance = clazz.getDeclaredConstructor().newInstance();
+                        Method method = clazz.getDeclaredMethod(urlMethode.nomMethode, HttpServletRequest.class, HttpServletResponse.class);
+                        method.invoke(instance, req, res);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
         }
     }
 }
