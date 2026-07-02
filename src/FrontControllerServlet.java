@@ -102,63 +102,77 @@ public class FrontControllerServlet extends HttpServlet {
         }
     }
 
-    private Map<String, String> listMethodsAnnotatedWithMapping(String url) {
-    if (listClassAnnoted.isEmpty()) {
-        return Map.of();
-    }
+    private Map<UtilMethode, UrlMethode> listMethodsAnnotatedWithMapping(String url, String httpMethod) {
+        if (listClassAnnoted.isEmpty()) {
+            return Map.of();
+        }
 
-    Map<String, String> result = listClassAnnoted.stream()
-            .flatMap(className -> {
-                try {
-                    Class<?> clazz = Class.forName(packageName + "." + className);
-
-                    return Arrays.stream(clazz.getDeclaredMethods())
-                            .filter(m -> m.isAnnotationPresent(Mapping.class))
-                            .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).value(), url))
-                            .map(m -> Map.entry(
-                                    m.getName(),
-                                    m.getAnnotation(Mapping.class).value()
-                            ));
-
-                } catch (ClassNotFoundException e) {
-                    e.printStackTrace();
-                    return java.util.stream.Stream.<Map.Entry<String, String>>empty();
-                }
-            })
-            .collect(Collectors.toMap(
-                    Map.Entry::getKey,
-                    Map.Entry::getValue,
-                    (a, b) -> a
-            ));
-
-    // fallback : si aucune méthode ne correspond à l'URL → toutes les méthodes @Mapping
-    if (result.isEmpty()) {
-        return listClassAnnoted.stream()
+        Map<UtilMethode, UrlMethode> result = listClassAnnoted.stream()
                 .flatMap(className -> {
                     try {
                         Class<?> clazz = Class.forName(packageName + "." + className);
 
                         return Arrays.stream(clazz.getDeclaredMethods())
                                 .filter(m -> m.isAnnotationPresent(Mapping.class))
-                                .map(m -> Map.entry(
-                                        m.getName(),
-                                        m.getAnnotation(Mapping.class).value()
-                                ));
+                                .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).value(), url))
+                                .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).method(), httpMethod))
+                                .map(m -> {
+                                    UtilMethode key = new UtilMethode();
+                                    key.url = url;
+                                    key.method = httpMethod;
+
+                                    UrlMethode value = new UrlMethode();
+                                    value.nomClasse = clazz.getSimpleName();
+                                    value.nomMethode = m.getName();
+
+                                    return Map.entry(key, value);
+                                });
 
                     } catch (ClassNotFoundException e) {
                         e.printStackTrace();
-                        return java.util.stream.Stream.<Map.Entry<String, String>>empty();
+                        return java.util.stream.Stream.<Map.Entry<UtilMethode, UrlMethode>>empty();
                     }
                 })
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         Map.Entry::getValue,
-                        (a, b) -> a
-                ));
-    }
+                        (a, b) -> a));
 
-    return result;
-}
+        // fallback : si aucune méthode ne correspond à l'URL et méthode HTTP → toutes
+        // les méthodes @Mapping
+        if (result.isEmpty()) {
+            return listClassAnnoted.stream()
+                    .flatMap(className -> {
+                        try {
+                            Class<?> clazz = Class.forName(packageName + "." + className);
+
+                            return Arrays.stream(clazz.getDeclaredMethods())
+                                    .filter(m -> m.isAnnotationPresent(Mapping.class))
+                                    .map(m -> {
+                                        UtilMethode key = new UtilMethode();
+                                        key.url = m.getAnnotation(Mapping.class).value();
+                                        key.method = m.getAnnotation(Mapping.class).method();
+
+                                        UrlMethode value = new UrlMethode();
+                                        value.nomClasse = clazz.getSimpleName();
+                                        value.nomMethode = m.getName();
+
+                                        return Map.entry(key, value);
+                                    });
+
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
+                            return java.util.stream.Stream.<Map.Entry<UtilMethode, UrlMethode>>empty();
+                        }
+                    })
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            Map.Entry::getValue,
+                            (a, b) -> a));
+        }
+
+        return result;
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
@@ -173,18 +187,23 @@ public class FrontControllerServlet extends HttpServlet {
     public void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
         String url = req.getServletPath();
+        String httpMethod = req.getMethod();
+
         out.println(url);
+        out.println("Méthode HTTP: " + httpMethod);
         out.println("Liste des classes annotees :");
         for (String s : listClassAnnoted) {
             out.println(s);
         }
 
-        Map<String, String> methods = listMethodsAnnotatedWithMapping(url);
+        Map<UtilMethode, UrlMethode> methods = listMethodsAnnotatedWithMapping(url, httpMethod);
         if (methods.isEmpty()) {
-            out.println("Aucune methode trouvee pour l'url : " + url);
+            out.println("Aucune methode trouvee pour l'url : " + url + " avec la methode : " + httpMethod);
         } else {
-            out.println("Liste des methodes annotees avec l'url : " + url);
-            methods.forEach((name, value) -> out.println(name + " - " + value));
+            out.println("Liste des methodes annotees avec l'url : " + url + " et methode : " + httpMethod);
+            methods.forEach((util, urlMethode) -> out.println(
+                    urlMethode.nomClasse + "." + urlMethode.nomMethode +
+                            " - URL: " + util.url + " METHOD: " + util.method));
         }
     }
 }
