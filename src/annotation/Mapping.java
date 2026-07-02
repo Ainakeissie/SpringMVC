@@ -9,5 +9,8 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Mapping {
     String value();
-    String method() default "GET";
+    type method();
+    enum type {
+        GET, POST
+    }
 }
