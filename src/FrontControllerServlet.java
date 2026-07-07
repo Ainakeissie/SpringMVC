@@ -22,6 +22,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletContextEvent;
 import src.annotation.Controller;
 import src.annotation.Mapping;
 
@@ -30,19 +32,25 @@ public class FrontControllerServlet extends HttpServlet {
     private String packageName;
 
     @Override
-    public void init() throws ServletException {
-        ServletConfig config = getServletConfig();
-        String configuredPackage = config != null ? config.getInitParameter("base-package") : null;
+    public void init(ServletConfig config) throws ServletException {
+        super.init(config);
+
+        ServletContext context = config.getServletContext();
+
+        String configuredPackage = context.getInitParameter("base-package");
+
         packageName = configuredPackage != null && !configuredPackage.isBlank()
                 ? configuredPackage
                 : "aina.main";
+
+        context.setAttribute("base-package", packageName);
 
         try {
             scanPackage(packageName);
         } catch (Exception e) {
             throw new ServletException(e);
         }
-    }
+    }   
 
     private void scanPackage(String packageName) throws IOException, ClassNotFoundException, URISyntaxException {
         String path = packageName.replace('.', '/');
@@ -115,11 +123,13 @@ public class FrontControllerServlet extends HttpServlet {
                         return Arrays.stream(clazz.getDeclaredMethods())
                                 .filter(m -> m.isAnnotationPresent(Mapping.class))
                                 .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).value(), url))
-                                .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).method(), httpMethod))
+                                .filter(m -> Objects.equals(m.getAnnotation(Mapping.class).method().name(),
+                                        httpMethod.toUpperCase()))
                                 .map(m -> {
                                     UtilMethode key = new UtilMethode();
+                                    Mapping mapping = m.getAnnotation(Mapping.class);
                                     key.url = url;
-                                    key.method = httpMethod;
+                                    key.method = mapping.method().name();
 
                                     UrlMethode value = new UrlMethode();
                                     value.nomClasse = clazz.getSimpleName();
@@ -138,8 +148,6 @@ public class FrontControllerServlet extends HttpServlet {
                         Map.Entry::getValue,
                         (a, b) -> a));
 
-        // fallback : si aucune méthode ne correspond à l'URL et méthode HTTP → toutes
-        // les méthodes @Mapping
         if (result.isEmpty()) {
             return listClassAnnoted.stream()
                     .flatMap(className -> {
@@ -150,8 +158,9 @@ public class FrontControllerServlet extends HttpServlet {
                                     .filter(m -> m.isAnnotationPresent(Mapping.class))
                                     .map(m -> {
                                         UtilMethode key = new UtilMethode();
-                                        key.url = m.getAnnotation(Mapping.class).value();
-                                        key.method = m.getAnnotation(Mapping.class).method();
+                                        Mapping mapping = m.getAnnotation(Mapping.class);
+                                        key.url = mapping.value();
+                                        key.method = mapping.method().name();
 
                                         UrlMethode value = new UrlMethode();
                                         value.nomClasse = clazz.getSimpleName();
@@ -207,11 +216,12 @@ public class FrontControllerServlet extends HttpServlet {
             out.println("Invoquer la methode qui correspond à l'url");
             methods.forEach((util, urlMethode) -> {
                 try {
-                    if(util.url.equals(url) && util.method.equals(httpMethod)) {
+                    if (util.url.equals(url) && util.method.equals(httpMethod)) {
                         Class<?> clazz = Class.forName(packageName + "." + urlMethode.nomClasse);
                         Object instance = clazz.getDeclaredConstructor().newInstance();
-                        Method method = clazz.getDeclaredMethod(urlMethode.nomMethode, HttpServletRequest.class, HttpServletResponse.class);
-                        method.invoke(instance, req, res);
+                        Method methode = clazz.getDeclaredMethod(urlMethode.nomMethode, HttpServletRequest.class,
+                                HttpServletResponse.class);
+                        methode.invoke(instance, req, res);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
