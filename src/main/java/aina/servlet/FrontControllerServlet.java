@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.Map;
 
 import aina.util.Mapping;
@@ -14,6 +15,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.context.ApplicationContext;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 
 public class FrontControllerServlet extends HttpServlet {
 
@@ -54,7 +57,16 @@ public class FrontControllerServlet extends HttpServlet {
             try {
                 Object controller = mapping.getControllerClass().getDeclaredConstructor().newInstance();
                 Method controllerMethod = mapping.getMethod();
-                Object result = controllerMethod.invoke(controller);
+                // Object result = controllerMethod.invoke(controller);
+                Parameter[] parameters = controllerMethod.getParameters();
+                Object[] arguments = new Object[parameters.length];
+                for(int i = 0; i < parameters.length; i++) {
+                    Parameter parameter = parameters[i];
+                    if(parameter.getType().equals(ApplicationContext.class)){
+                        arguments[i] = WebApplicationContextUtils.getRequiredWebApplicationContext(getServletContext());
+                    }
+                }
+                Object result = controllerMethod.invoke(controller, arguments);
 
                 if (result instanceof ModAndView mav) {
                     for (Map.Entry<String, Object> en : mav.getValues().entrySet()) {
