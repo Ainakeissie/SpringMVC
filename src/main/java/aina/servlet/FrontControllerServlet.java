@@ -11,6 +11,7 @@ import aina.util.Mapping;
 import aina.util.ModAndView;
 import aina.util.UrlMethod;
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,8 +30,8 @@ public class FrontControllerServlet extends HttpServlet {
     public void init() throws ServletException {
         super.init();
         routesWithMethod = (Map<UrlMethod, Mapping>) getServletContext().getAttribute("routesWithMethod");
-        viewPrefix = (String)getServletContext().getAttribute("prefix");
-        viewSuffix = (String)getServletContext().getAttribute("suffix");
+        viewPrefix = (String) getServletContext().getAttribute("prefix");
+        viewSuffix = (String) getServletContext().getAttribute("suffix");
     }
 
     @Override
@@ -57,15 +58,23 @@ public class FrontControllerServlet extends HttpServlet {
             try {
                 Object controller = mapping.getControllerClass().getDeclaredConstructor().newInstance();
                 Method controllerMethod = mapping.getMethod();
-                // Object result = controllerMethod.invoke(controller);
+
+                ServletContext servletContext = getServletContext();
+
+                ApplicationContext context = WebApplicationContextUtils
+                        .getWebApplicationContext(servletContext);
+
                 Parameter[] parameters = controllerMethod.getParameters();
                 Object[] arguments = new Object[parameters.length];
-                for(int i = 0; i < parameters.length; i++) {
+
+                for (int i = 0; i < parameters.length; i++) {
                     Parameter parameter = parameters[i];
-                    if(parameter.getType().equals(ApplicationContext.class)){
-                        arguments[i] = WebApplicationContextUtils.getRequiredWebApplicationContext(getServletContext());
+
+                    if (parameter.getType().equals(ApplicationContext.class)) {
+                        arguments[i] = context;
                     }
                 }
+
                 Object result = controllerMethod.invoke(controller, arguments);
 
                 if (result instanceof ModAndView mav) {
