@@ -39,6 +39,7 @@ public class AppServletContextListener implements ServletContextListener {
             }
 
             LoadingClass.loadUrlMappingsWithMethod(packageName, toutesLesRoutes);
+
             viewPrefix = sce.getServletContext().getInitParameter("view.prefix");
             viewSuffix = sce.getServletContext().getInitParameter("view.suffix");
 

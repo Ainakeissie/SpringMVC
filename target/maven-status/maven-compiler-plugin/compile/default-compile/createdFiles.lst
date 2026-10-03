@@ -4,5 +4,6 @@ aina/util/Mapping.class
 aina/annotation/MonController.class
 aina/util/LoadingClass.class
 aina/annotation/UrlMapping.class
+aina/annotation/Json.class
 aina/util/UrlMethod.class
 aina/listener/AppServletContextListener.class

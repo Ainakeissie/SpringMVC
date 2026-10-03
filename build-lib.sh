@@ -10,6 +10,19 @@ if [ "${1-}" = "--install" ]; then
   INSTALL_LOCAL=true
 fi
 
+for candidate in \
+  /usr/lib/jvm/java-21-openjdk-amd64 \
+  /usr/lib/jvm/java-1.21.0-openjdk-amd64 \
+  /usr/lib/jvm/openjdk-21
+do
+  if [ -x "$candidate/bin/java" ]; then
+    JAVA_HOME="$candidate"
+    export JAVA_HOME
+    export PATH="$JAVA_HOME/bin:$PATH"
+    break
+  fi
+done
+
 if command -v mvn >/dev/null 2>&1; then
   MVN="mvn"
 else
