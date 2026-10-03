@@ -90,7 +90,8 @@ public class LoadingClass {
         return routes.containsKey(urlMethod);
     }
 
-   public static void loadUrlMappingsWithMethod(String packageName,  Map<UrlMethod, Mapping> routes) throws IllegalStateException {
+    public static void loadUrlMappingsWithMethod(String packageName, Map<UrlMethod, Mapping> routes)
+            throws IllegalStateException {
 
         Class<? extends Annotation> controllerAnnotationClass;
         Class<? extends Annotation> urlMappingAnnotationClass;
@@ -101,10 +102,12 @@ public class LoadingClass {
             String urlMappingClassName = prop.getProperty("annotation.mapping");
 
             if (controllerClassName == null || controllerClassName.isBlank()) {
-                throw new RuntimeException("[ERREUR] La propriété 'annotation.controller' est manquante dans config.properties.");
+                throw new RuntimeException(
+                        "[ERREUR] La propriété 'annotation.controller' est manquante dans config.properties.");
             }
             if (urlMappingClassName == null || urlMappingClassName.isBlank()) {
-                throw new RuntimeException("[ERREUR] La propriété 'annotation.mapping' est manquante dans config.properties.");
+                throw new RuntimeException(
+                        "[ERREUR] La propriété 'annotation.mapping' est manquante dans config.properties.");
             }
 
             controllerAnnotationClass = Class.forName(controllerClassName).asSubclass(Annotation.class);
@@ -137,10 +140,10 @@ public class LoadingClass {
                                 Mapping mappingExistant = routes.get(urlMethod);
                                 throw new IllegalStateException(
                                         """
-                                        [ERREUR] Conflit de routes détecté !
-                                        La route [%s %s] est déjà associée à la méthode : %s.%s()
-                                        Impossible de la réassigner à : %s.%s()
-                                        """.formatted(
+                                                [ERREUR] Conflit de routes détecté !
+                                                La route [%s %s] est déjà associée à la méthode : %s.%s()
+                                                Impossible de la réassigner à : %s.%s()
+                                                """.formatted(
                                                 methodType,
                                                 url,
                                                 mappingExistant.getControllerClass().getName(),
@@ -155,7 +158,8 @@ public class LoadingClass {
 
                 } catch (ClassNotFoundException e) {
                     throw new RuntimeException("Erreur lors du chargement de la classe : " + classInfo.getName(), e);
-                } catch (IllegalAccessException | IllegalStateException | NoSuchMethodException | SecurityException | InvocationTargetException e) {
+                } catch (IllegalAccessException | IllegalStateException | NoSuchMethodException | SecurityException
+                        | InvocationTargetException e) {
                     throw new RuntimeException("Erreur lors de la lecture dynamique des méthodes de l'annotation", e);
                 }
             }
@@ -174,10 +178,12 @@ public class LoadingClass {
             String urlMappingClassName = prop.getProperty("annotation.mapping");
 
             if (controllerClassName == null || controllerClassName.isBlank()) {
-                throw new RuntimeException("[ERREUR] La propriété 'annotation.controller' est manquante dans config.properties.");
+                throw new RuntimeException(
+                        "[ERREUR] La propriété 'annotation.controller' est manquante dans config.properties.");
             }
             if (urlMappingClassName == null || urlMappingClassName.isBlank()) {
-                throw new RuntimeException("[ERREUR] La propriété 'annotation.mapping' est manquante dans config.properties.");
+                throw new RuntimeException(
+                        "[ERREUR] La propriété 'annotation.mapping' est manquante dans config.properties.");
             }
 
             controllerAnnotationClass = Class.forName(controllerClassName).asSubclass(Annotation.class);
@@ -202,7 +208,8 @@ public class LoadingClass {
 
                         if (urlMapping != null) {
                             String url = (String) urlMappingAnnotationClass.getMethod("value").invoke(urlMapping);
-                            String methodType = (String) urlMappingAnnotationClass.getMethod("method").invoke(urlMapping);
+                            String methodType = (String) urlMappingAnnotationClass.getMethod("method")
+                                    .invoke(urlMapping);
 
                             UrlMethod urlMethod = new UrlMethod(url, methodType);
 
@@ -210,10 +217,10 @@ public class LoadingClass {
                                 Mapping mappingExistant = routes.get(urlMethod);
                                 throw new IllegalStateException(
                                         """
-                                        [ERREUR] Conflit de routes détecté !
-                                        La route [%s %s] est déjà associée à la méthode : %s.%s()
-                                        Impossible de la réassigner à : %s.%s()
-                                        """.formatted(
+                                                [ERREUR] Conflit de routes détecté !
+                                                La route [%s %s] est déjà associée à la méthode : %s.%s()
+                                                Impossible de la réassigner à : %s.%s()
+                                                """.formatted(
                                                 methodType,
                                                 url,
                                                 mappingExistant.getControllerClass().getName(),
@@ -228,7 +235,8 @@ public class LoadingClass {
 
                 } catch (ClassNotFoundException e) {
                     throw new RuntimeException("Erreur lors du chargement de la classe : " + classInfo.getName(), e);
-                } catch (IllegalAccessException | IllegalStateException | NoSuchMethodException | SecurityException | InvocationTargetException e) {
+                } catch (IllegalAccessException | IllegalStateException | NoSuchMethodException | SecurityException
+                        | InvocationTargetException e) {
                     throw new RuntimeException("Erreur lors de la lecture dynamique des méthodes de l'annotation", e);
                 }
             }
@@ -288,7 +296,6 @@ public class LoadingClass {
         }
         return listeClasse;
     }
-
     public static List<String> loadClassWithMyMethodeAnnotation(String packageName, String monAnnotation) {
         List<String> listeClasse = new ArrayList<>();
         try (ScanResult scanResult = new ClassGraph().enableAllInfo().acceptPackages(packageName).scan()) {

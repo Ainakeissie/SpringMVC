@@ -1,8 +1,10 @@
 package aina.util;
+
 import java.lang.reflect.Method;
 
 public class Mapping {
     private final Class<?> controllerClass;
+
     private final Method method;
 
     public Mapping(Class<?> controllerClass, Method method) {
@@ -10,9 +12,17 @@ public class Mapping {
         this.method = method;
     }
 
-    public String getClassName() { return controllerClass.getName(); }
-    public Method getMethod() { return method; }
-    public Class<?> getControllerClass() { return controllerClass; }
+    public String getClassName() {
+        return controllerClass.getName();
+    }
+
+    public Method getMethod() {
+        return method;
+    }
+
+    public Class<?> getControllerClass() {
+        return controllerClass;
+    }
 
     @Override
     public String toString() {

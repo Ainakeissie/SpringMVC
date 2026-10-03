@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 
+import aina.annotation.Json;
 import aina.util.Mapping;
 import aina.util.ModAndView;
 import aina.util.UrlMethod;
@@ -18,11 +19,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FrontControllerServlet extends HttpServlet {
 
     Map<UrlMethod, Mapping> routesWithMethod;
+
     String viewPrefix;
+
     String viewSuffix;
 
     @SuppressWarnings("unchecked")
@@ -44,6 +48,22 @@ public class FrontControllerServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         processRequest(request, response);
+    }
+
+    // écrire la réponse JSON dans le flux de sortie
+    private void writeJsonResponse(Object retour, HttpServletResponse res) {
+        res.setStatus(HttpServletResponse.SC_OK);
+        res.setContentType("application/json");
+        res.setCharacterEncoding("UTF-8");
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            String jsonResponse = objectMapper.writeValueAsString(retour);
+            PrintWriter out = res.getWriter();
+            out.print(jsonResponse);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -76,6 +96,11 @@ public class FrontControllerServlet extends HttpServlet {
                 }
 
                 Object result = controllerMethod.invoke(controller, arguments);
+
+                if (mapping.getControllerClass().isAnnotationPresent(Json.class)) {
+                    writeJsonResponse(result, response);
+                    return;
+                }
 
                 if (result instanceof ModAndView mav) {
                     for (Map.Entry<String, Object> en : mav.getValues().entrySet()) {

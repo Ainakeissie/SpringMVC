@@ -2,13 +2,17 @@ package aina.util;
 
 import java.util.HashMap;
 import java.util.Map;
+
+
 public class ModAndView {
     private String view;
+
     private Map<String, Object> values;
 
     public ModAndView() {
         this.values = new HashMap<>();
     }
+
     public ModAndView(String view, Map<String, Object> values) {
         this.view = view;
         this.values = values;
