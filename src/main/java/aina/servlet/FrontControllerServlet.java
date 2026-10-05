@@ -28,6 +28,7 @@ public class FrontControllerServlet extends HttpServlet {
     String viewPrefix;
 
     String viewSuffix;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @SuppressWarnings("unchecked")
     @Override
@@ -50,25 +51,13 @@ public class FrontControllerServlet extends HttpServlet {
         processRequest(request, response);
     }
 
-    // écrire la réponse JSON dans le flux de sortie
-    private void writeJsonResponse(Object retour, HttpServletResponse res) {
-        res.setStatus(HttpServletResponse.SC_OK);
-        res.setContentType("application/json");
-        res.setCharacterEncoding("UTF-8");
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            String jsonResponse = objectMapper.writeValueAsString(retour);
-            PrintWriter out = res.getWriter();
-            out.print(jsonResponse);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     private void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
         String pathInfo = request.getRequestURI().substring(request.getContextPath().length());
+        if (pathInfo.startsWith("/WEB-INF/") || pathInfo.startsWith("/META-INF/")) {
+            return;
+        }
+
         UrlMethod urlMethod = new UrlMethod(pathInfo, request.getMethod());
 
         if (aina.util.LoadingClass.isARouteInsideMappingWithMethod(urlMethod, routesWithMethod)) {
@@ -97,9 +86,14 @@ public class FrontControllerServlet extends HttpServlet {
 
                 Object result = controllerMethod.invoke(controller, arguments);
 
-                if (mapping.getControllerClass().isAnnotationPresent(Json.class)) {
-                    writeJsonResponse(result, response);
-                    return;
+                if (controllerMethod.isAnnotationPresent(Json.class)) {
+                    if (result instanceof String) {
+                        response.setContentType("text/plain;charset=UTF-8");
+                        response.getWriter().print(result);
+                    } else {
+                        response.setContentType("application/json;charset=UTF-8");
+                        objectMapper.writeValue(response.getWriter(), result);
+                    }
                 }
 
                 if (result instanceof ModAndView mav) {
