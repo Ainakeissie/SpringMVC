@@ -28,6 +28,7 @@ public class FrontControllerServlet extends HttpServlet {
     String viewPrefix;
 
     String viewSuffix;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @SuppressWarnings("unchecked")
     @Override
@@ -50,25 +51,83 @@ public class FrontControllerServlet extends HttpServlet {
         processRequest(request, response);
     }
 
-    // écrire la réponse JSON dans le flux de sortie
-    private void writeJsonResponse(Object retour, HttpServletResponse res) {
-        res.setStatus(HttpServletResponse.SC_OK);
-        res.setContentType("application/json");
-        res.setCharacterEncoding("UTF-8");
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            String jsonResponse = objectMapper.writeValueAsString(retour);
-            PrintWriter out = res.getWriter();
-            out.print(jsonResponse);
-        } catch (IOException e) {
-            e.printStackTrace();
+    public Object cast(String value, Class<?> type) {
+        if (value == null) {
+            return null;
         }
+
+        if (type == String.class) {
+            return value;
+        }
+
+        if (type == int.class || type == Integer.class) {
+            return Integer.parseInt(value);
+        }
+
+        if (type == long.class || type == Long.class) {
+            return Long.parseLong(value);
+        }
+
+        if (type == double.class || type == Double.class) {
+            return Double.parseDouble(value);
+        }
+
+        if (type == float.class || type == Float.class) {
+            return Float.parseFloat(value);
+        }
+
+        if (type == boolean.class || type == Boolean.class) {
+            return Boolean.parseBoolean(value);
+        }
+
+        if (type == short.class || type == Short.class) {
+            return Short.parseShort(value);
+        }
+
+        if (type == byte.class || type == Byte.class) {
+            return Byte.parseByte(value);
+        }
+
+        if (type == char.class || type == Character.class) {
+            return value.charAt(0);
+        }
+
+        if (type == java.util.Date.class) {
+            try {
+                java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("yyyy-MM-dd");
+
+                return format.parse(value);
+
+            } catch (java.text.ParseException e) {
+                throw new IllegalArgumentException(
+                        "Date invalide : " + value, e);
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "Type non supporté : " + type.getName());
+    }
+
+    private Object[] getMethodArguments(Method method, HttpServletRequest request, ApplicationContext context) {
+        Parameter[] parameters = method.getParameters();
+        Object[] arguments = new Object[parameters.length];
+        for (int i = 0; i < parameters.length; i++) {
+            arguments[i] = request.getParameter(parameters[i].getName());
+            if(arguments[i] instanceof String) {
+                arguments[i] = cast((String) arguments[i], parameters[i].getType());
+            }
+        }
+
+        return arguments;
     }
 
     private void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
         String pathInfo = request.getRequestURI().substring(request.getContextPath().length());
+        if (pathInfo.startsWith("/WEB-INF/") || pathInfo.startsWith("/META-INF/")) {
+            return;
+        }
+
         UrlMethod urlMethod = new UrlMethod(pathInfo, request.getMethod());
 
         if (aina.util.LoadingClass.isARouteInsideMappingWithMethod(urlMethod, routesWithMethod)) {
@@ -87,6 +146,8 @@ public class FrontControllerServlet extends HttpServlet {
                 Parameter[] parameters = controllerMethod.getParameters();
                 Object[] arguments = new Object[parameters.length];
 
+                arguments = getMethodArguments(controllerMethod, request, context);
+
                 for (int i = 0; i < parameters.length; i++) {
                     Parameter parameter = parameters[i];
 
@@ -97,9 +158,14 @@ public class FrontControllerServlet extends HttpServlet {
 
                 Object result = controllerMethod.invoke(controller, arguments);
 
-                if (mapping.getControllerClass().isAnnotationPresent(Json.class)) {
-                    writeJsonResponse(result, response);
-                    return;
+                if (controllerMethod.isAnnotationPresent(Json.class)) {
+                    if (result instanceof String) {
+                        response.setContentType("text/plain;charset=UTF-8");
+                        response.getWriter().print(result);
+                    } else {
+                        response.setContentType("application/json;charset=UTF-8");
+                        objectMapper.writeValue(response.getWriter(), result);
+                    }
                 }
 
                 if (result instanceof ModAndView mav) {
