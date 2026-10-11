@@ -2,9 +2,11 @@ package aina.servlet;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Modifier;
 import java.util.Map;
 
 import aina.annotation.Json;
@@ -108,7 +110,7 @@ public class FrontControllerServlet extends HttpServlet {
                 "Type non supporté : " + type.getName());
     }
 
-    private Object[] getMethodArguments(Method method, HttpServletRequest request, ApplicationContext context) {
+    private Object[] getMethodArguments(Method method, HttpServletRequest request) {
         Parameter[] parameters = method.getParameters();
         Object[] arguments = new Object[parameters.length];
         for (int i = 0; i < parameters.length; i++) {
@@ -119,6 +121,60 @@ public class FrontControllerServlet extends HttpServlet {
         }
 
         return arguments;
+    }
+
+    private Object[] getMethodArgumentsObject(Method method, HttpServletRequest request) {
+        Parameter[] parameters = method.getParameters();
+        Object[] arguments = new Object[parameters.length];
+
+        for (int i = 0; i < parameters.length; i++) {
+            Class<?> parameterType = parameters[i].getType();
+
+            // L'ApplicationContext est injecté plus bas dans processRequest.
+            if (parameterType.equals(ApplicationContext.class)) {
+                continue;
+            }
+
+            if (isSimpleType(parameterType)) {
+                arguments[i] = cast(request.getParameter(parameters[i].getName()), parameterType);
+                continue;
+            }
+
+            try {
+                Object object = parameterType.getDeclaredConstructor().newInstance();
+
+                for (Field field : parameterType.getDeclaredFields()) {
+                    if (Modifier.isStatic(field.getModifiers()) || Modifier.isFinal(field.getModifiers())) {
+                        continue;
+                    }
+
+                    String value = request.getParameter(field.getName());
+                    if (value != null) {
+                        field.setAccessible(true);
+                        field.set(object, cast(value, field.getType()));
+                    }
+                }
+
+                arguments[i] = object;
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalArgumentException(
+                        "Impossible de créer l'objet paramètre : " + parameterType.getName(), e);
+            }
+        }
+
+        return arguments;
+    }
+
+    private boolean isSimpleType(Class<?> type) {
+        return type == String.class || type == int.class || type == Integer.class
+                || type == long.class || type == Long.class
+                || type == double.class || type == Double.class
+                || type == float.class || type == Float.class
+                || type == boolean.class || type == Boolean.class
+                || type == short.class || type == Short.class
+                || type == byte.class || type == Byte.class
+                || type == char.class || type == Character.class
+                || type == java.util.Date.class;
     }
 
     private void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -146,7 +202,7 @@ public class FrontControllerServlet extends HttpServlet {
                 Parameter[] parameters = controllerMethod.getParameters();
                 Object[] arguments = new Object[parameters.length];
 
-                arguments = getMethodArguments(controllerMethod, request, context);
+                arguments = getMethodArgumentsObject(controllerMethod, request);
 
                 for (int i = 0; i < parameters.length; i++) {
                     Parameter parameter = parameters[i];
