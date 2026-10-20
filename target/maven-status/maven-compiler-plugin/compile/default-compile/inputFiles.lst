@@ -4,6 +4,7 @@
 /home/aina/S4/web-dyn/exo/SpringMVC/src/main/java/aina/listener/AppServletContextListener.java
 /home/aina/S4/web-dyn/exo/SpringMVC/src/main/java/aina/servlet/FrontControllerServlet.java
 /home/aina/S4/web-dyn/exo/SpringMVC/src/main/java/aina/util/LoadingClass.java
+/home/aina/S4/web-dyn/exo/SpringMVC/src/main/java/aina/util/Mapfile.java
 /home/aina/S4/web-dyn/exo/SpringMVC/src/main/java/aina/util/Mapping.java
 /home/aina/S4/web-dyn/exo/SpringMVC/src/main/java/aina/util/ModAndView.java
 /home/aina/S4/web-dyn/exo/SpringMVC/src/main/java/aina/util/UrlMethod.java

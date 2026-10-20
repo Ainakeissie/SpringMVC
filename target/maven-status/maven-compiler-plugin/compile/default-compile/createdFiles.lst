@@ -2,6 +2,7 @@ aina/servlet/FrontControllerServlet.class
 aina/util/ModAndView.class
 aina/util/Mapping.class
 aina/annotation/MonController.class
+aina/util/Mapfile.class
 aina/util/LoadingClass.class
 aina/annotation/UrlMapping.class
 aina/annotation/Json.class

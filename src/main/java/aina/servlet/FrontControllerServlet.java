@@ -6,10 +6,14 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import aina.annotation.Json;
+import aina.util.Mapfile;
 import aina.util.Mapping;
 import aina.util.ModAndView;
 import aina.util.UrlMethod;
@@ -22,6 +26,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Part;
 
 public class FrontControllerServlet extends HttpServlet {
 
@@ -110,17 +115,77 @@ public class FrontControllerServlet extends HttpServlet {
                 "Type non supporté : " + type.getName());
     }
 
-    private Object[] getMethodArguments(Method method, HttpServletRequest request) {
-        Parameter[] parameters = method.getParameters();
-        Object[] arguments = new Object[parameters.length];
-        for (int i = 0; i < parameters.length; i++) {
-            arguments[i] = request.getParameter(parameters[i].getName());
-            if(arguments[i] instanceof String) {
-                arguments[i] = cast((String) arguments[i], parameters[i].getType());
+    // private Object[] getMethodArguments(Method method, HttpServletRequest
+    // request) {
+    // Parameter[] parameters = method.getParameters();
+    // Object[] arguments = new Object[parameters.length];
+    // for (int i = 0; i < parameters.length; i++) {
+    // arguments[i] = request.getParameter(parameters[i].getName());
+    // if(arguments[i] instanceof String) {
+    // arguments[i] = cast((String) arguments[i], parameters[i].getType());
+    // }
+    // }
+
+    // return arguments;
+    // }
+
+    private Object bindObject(Class<?> clazz, HttpServletRequest request, String prefix) {
+        try {
+            Object object = clazz.getDeclaredConstructor().newInstance();
+
+            for (Field field : clazz.getDeclaredFields()) {
+                if (!Modifier.isStatic(field.getModifiers()) && !Modifier.isFinal(field.getModifiers())) {
+                    bindField(object, field, request, prefix);
+                }
             }
+
+            return object;
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalArgumentException(
+                    "Impossible de créer l'objet paramètre : " + clazz.getName(), e);
+        }
+    }
+
+    private void bindField(Object object, Field field, HttpServletRequest request, String prefix)
+            throws IllegalAccessException {
+        String fieldPath = prefix.isBlank() ? field.getName() : prefix + "." + field.getName();
+        field.setAccessible(true);
+
+        if (isSimpleType(field.getType())) {
+            String value = request.getParameter(fieldPath);
+            if (value != null) {
+                field.set(object, cast(value, field.getType()));
+            }
+            return;
         }
 
-        return arguments;
+        if (List.class.isAssignableFrom(field.getType())) {
+            field.set(object, bindList(field.getGenericType(), request, fieldPath, field.getName()));
+            return;
+        }
+
+        field.set(object, bindObject(field.getType(), request, fieldPath));
+    }
+
+    private List<Object> bindList(java.lang.reflect.Type genericType,
+            HttpServletRequest request, String parameterName, String name) {
+        if (!(genericType instanceof ParameterizedType typeListe)
+                || !(typeListe.getActualTypeArguments()[0] instanceof Class<?> typeElement)) {
+            throw new IllegalArgumentException("La liste doit préciser un type, par exemple List<String> : " + name);
+        }
+
+        if (!isSimpleType(typeElement)) {
+            throw new IllegalArgumentException("Seules les listes de types simples sont prises en charge : " + name);
+        }
+
+        List<Object> liste = new ArrayList<>();
+        String[] valeurs = request.getParameterValues(parameterName);
+        if (valeurs != null) {
+            for (String valeur : valeurs) {
+                liste.add(cast(valeur, typeElement));
+            }
+        }
+        return liste;
     }
 
     private Object[] getMethodArgumentsObject(Method method, HttpServletRequest request) {
@@ -130,36 +195,23 @@ public class FrontControllerServlet extends HttpServlet {
         for (int i = 0; i < parameters.length; i++) {
             Class<?> parameterType = parameters[i].getType();
 
-            // L'ApplicationContext est injecté plus bas dans processRequest.
             if (parameterType.equals(ApplicationContext.class)) {
                 continue;
             }
 
             if (isSimpleType(parameterType)) {
                 arguments[i] = cast(request.getParameter(parameters[i].getName()), parameterType);
+                System.out.println(parameters[i].getName());
                 continue;
             }
 
-            try {
-                Object object = parameterType.getDeclaredConstructor().newInstance();
-
-                for (Field field : parameterType.getDeclaredFields()) {
-                    if (Modifier.isStatic(field.getModifiers()) || Modifier.isFinal(field.getModifiers())) {
-                        continue;
-                    }
-
-                    String value = request.getParameter(field.getName());
-                    if (value != null) {
-                        field.setAccessible(true);
-                        field.set(object, cast(value, field.getType()));
-                    }
-                }
-
-                arguments[i] = object;
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalArgumentException(
-                        "Impossible de créer l'objet paramètre : " + parameterType.getName(), e);
+            if (List.class.isAssignableFrom(parameterType)) {
+                arguments[i] = bindList(parameters[i].getParameterizedType(), request,
+                        parameters[i].getName(), parameters[i].getName());
+                continue;
             }
+
+            arguments[i] = bindObject(parameterType, request, "");
         }
 
         return arguments;
@@ -210,6 +262,23 @@ public class FrontControllerServlet extends HttpServlet {
                     if (parameter.getType().equals(ApplicationContext.class)) {
                         arguments[i] = context;
                     }
+                    if (parameter.getType().equals(byte[].class)) {
+                        Part tab_byte = request.getPart("fichier");
+                        byte[] tableau_byte = null;
+                        String nom = null;
+                        String extension = null;
+                        if (tab_byte != null) {
+                            tableau_byte = tab_byte.getInputStream().readAllBytes();
+                            nom = tab_byte.getSubmittedFileName();
+                            if (nom != null && nom.contains(".")) {
+                                extension = nom.substring(nom.lastIndexOf(".") + 1);
+                            }
+                        }
+                        Mapfile mapfile = new Mapfile();
+                        mapfile.setTableau_byte(tableau_byte);
+                        mapfile.setNom(nom);
+                        mapfile.setExtension(extension);
+                    }
                 }
 
                 Object result = controllerMethod.invoke(controller, arguments);
@@ -222,6 +291,7 @@ public class FrontControllerServlet extends HttpServlet {
                         response.setContentType("application/json;charset=UTF-8");
                         objectMapper.writeValue(response.getWriter(), result);
                     }
+                    return;
                 }
 
                 if (result instanceof ModAndView mav) {
