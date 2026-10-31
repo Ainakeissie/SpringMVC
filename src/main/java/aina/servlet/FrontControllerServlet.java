@@ -14,6 +14,8 @@ import java.util.Map;
 
 import aina.annotation.Json;
 import aina.annotation.Auth;
+import aina.annotation.Singleton;
+
 import aina.util.Mapfile;
 import aina.util.Mapping;
 import aina.util.ModAndView;
@@ -29,6 +31,7 @@ import org.springframework.web.context.support.WebApplicationContextUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Part;
 import aina.util.AppSession;
+
 public class FrontControllerServlet extends HttpServlet {
 
     Map<UrlMethod, Mapping> routesWithMethod;
@@ -250,7 +253,21 @@ public class FrontControllerServlet extends HttpServlet {
             System.out.println("Route trouvée : " + urlMethod + " -> " + mapping);
 
             try {
-                Object controller = mapping.getControllerClass().getDeclaredConstructor().newInstance();
+                Object controller = null;
+                if(mapping.getControllerClass().isAnnotationPresent(Singleton.class)) {
+                    ServletContext servletContext = getServletContext();
+                    String singletonKey = mapping.getControllerClass().getName();
+                    controller = servletContext.getAttribute(singletonKey);
+                    if (controller == null) {
+                        controller = mapping.getControllerClass().getDeclaredConstructor().newInstance();
+                        servletContext.setAttribute(singletonKey, controller);
+                    }
+                }
+                else {
+                controller = mapping.getControllerClass().getDeclaredConstructor().newInstance();
+                }
+                
+                
                 Method controllerMethod = mapping.getMethod();
 
                 ServletContext servletContext = getServletContext();
