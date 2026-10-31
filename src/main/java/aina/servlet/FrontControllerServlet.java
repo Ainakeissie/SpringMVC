@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import aina.annotation.Json;
+import aina.annotation.Auth;
 import aina.util.Mapfile;
 import aina.util.Mapping;
 import aina.util.ModAndView;
@@ -256,6 +257,43 @@ public class FrontControllerServlet extends HttpServlet {
 
                 ApplicationContext context = WebApplicationContextUtils
                         .getWebApplicationContext(servletContext);
+               
+                // Sprint 10 bis 
+                if (controllerMethod.isAnnotationPresent(Auth.class)) {
+                    Auth auth = controllerMethod.getAnnotation(Auth.class);
+                    AppSession session = getAppCurrentSession(request);
+
+                    String[] values = auth.value();
+                    String key = auth.key();
+                    boolean isAuthorized = false;
+
+                    if (values.length == 0) 
+                    {
+                        isAuthorized = true;
+                    } 
+                    else 
+                    {
+                        String sessionValue = (String) session.getSessionData(key);
+                        for (String value : values) 
+                        {
+                            if (sessionValue != null && sessionValue.toLowerCase().equals(value.toLowerCase())) 
+                            {
+                                isAuthorized = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!isAuthorized) 
+                    {
+                        response.setContentType("text/plain;charset=UTF-8");
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        try (PrintWriter out = response.getWriter()) 
+                        {
+                            out.println("Accès refusé : l'accès n'est pas autorisé.");
+                        }
+                        return;
+                    }
+                }
 
                 Parameter[] parameters = controllerMethod.getParameters();
                 Object[] arguments = new Object[parameters.length];
