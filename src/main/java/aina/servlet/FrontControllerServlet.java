@@ -27,7 +27,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Part;
-
+import aina.util.AppSession;
 public class FrontControllerServlet extends HttpServlet {
 
     Map<UrlMethod, Mapping> routesWithMethod;
@@ -210,8 +210,14 @@ public class FrontControllerServlet extends HttpServlet {
                         parameters[i].getName(), parameters[i].getName());
                 continue;
             }
+            else{
+                if(parameterType.equals(AppSession.class)){
+                    arguments[i] = getAppCurrentSession(request);
+                    continue;
+                }
+                arguments[i] = bindObject(parameterType, request, "");
+            }
 
-            arguments[i] = bindObject(parameterType, request, "");
         }
 
         return arguments;
@@ -335,5 +341,16 @@ public class FrontControllerServlet extends HttpServlet {
                 });
             }
         }
+    }
+
+    private AppSession getAppCurrentSession(HttpServletRequest request) {
+        AppSession session = null ;
+       session = (AppSession) getServletContext().getAttribute(request.getSession().getId());
+        if(session == null) {
+            session = new AppSession(request.getSession().getId());
+            getServletContext().setAttribute(request.getSession().getId(), session);
+        }
+        return session;
+
     }
 }
